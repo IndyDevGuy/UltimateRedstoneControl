@@ -32,6 +32,9 @@ local function pathFromUrl(url)
   return rel
 end
 
+local function combine(a,b) return fs.combine(a or "", b or "") end
+local RUN_BASE = fs.getDir(shell.getRunningProgram() or "")  -- dir of this updater.lua
+
 local function baseFromManifest(url) return (url:gsub("/manifest%.json$","")) end
 local function appJsonFromManifest(url) return baseFromManifest(url).."/app.json" end
 local function manifestFromOwnerRepo(owner,repo) return ("https://%s.github.io/%s/manifest.json"):format(owner,repo) end
