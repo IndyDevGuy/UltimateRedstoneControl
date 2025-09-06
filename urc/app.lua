@@ -43,6 +43,7 @@ end
 
 local function renderVersion()
   local installedVersion = "v" .. version.VERSION   -- version = dofile("urc/version.lua")
+  manifestMngr:setData()
   local latestVersion    = manifestMngr.latestVersion or installedVersion
   local updateText = (manifestMngr:vcmp(installedVersion, latestVersion) >= 0) and "Latest" or "Update"
   -- draw + capture clickable rect
