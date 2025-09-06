@@ -61,7 +61,7 @@ manifestUrl = manifestFromOwnerRepo("indydevguy", "UltimateRedstoneControl")
 end
 
 -- ---------- fetch latest version info ----------
-local installedVersion = "0.0.0"
+local installedVersion = "1.0.1"
 local prev = loadLock()
 if prev and prev.version then installedVersion = prev.version end
 
