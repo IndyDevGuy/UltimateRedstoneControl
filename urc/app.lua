@@ -337,9 +337,7 @@ while true do
           buf:commit()
           sleep(1)
         end
-
-        -- Reload version + manifest and re-render current screen
-        version       = dofile(rel("version.lua"))
+        
         manifestMngr:setData()
 
         if pageState == "main" then
