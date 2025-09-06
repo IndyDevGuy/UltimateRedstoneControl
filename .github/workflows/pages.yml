@@ -21,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Generate manifest.json (raw URLs, pinned to commit)
+      - name: Generate manifest.json and installer.json
         run: |
           python3 - <<'PY'
           import os, json, pathlib
@@ -36,11 +36,22 @@ jobs:
                 urls.append(f'https://raw.githubusercontent.com/{repo}/{sha}/{rel}')
           else:
             print("WARNING: no /urc directory found; manifest will be empty.")
+
           pathlib.Path('public').mkdir(exist_ok=True)
           with open('public/manifest.json','w') as f:
             json.dump(urls, f, indent=2)
-          print(f"Wrote manifest.json with {len(urls)} entries")
+
+          # installer.json: version + raw URL to install.lua (pinned to commit)
+          version = "0.0.0"
+          if pathlib.Path('installer_version.txt').exists():
+            version = pathlib.Path('installer_version.txt').read_text().strip() or "0.0.0"
+          inst_url = f'https://raw.githubusercontent.com/{repo}/{sha}/install.lua'
+          with open('public/installer.json','w') as f:
+            json.dump({"version": version, "url": inst_url}, f, indent=2)
+
+          print(f"Wrote manifest.json ({len(urls)} files) and installer.json (v{version})")
           PY
+
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
