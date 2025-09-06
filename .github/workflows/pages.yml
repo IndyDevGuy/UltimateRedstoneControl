@@ -51,6 +51,9 @@ jobs:
           (out/'app.json').write_text(json.dumps(app, indent=2))
 
           # installer.json (for self-updating installer.lua)
+          version = '0.0.0'
+          pv = pathlib.Path('installer_version.txt')
+          if pv.exists(): version = pv.read_text().strip() or '0.0.0'
           inst_url = f'https://raw.githubusercontent.com/{owner}/{repo}/{sha}/install.lua'
           (out/'installer.json').write_text(json.dumps({"version": version, "url": inst_url}, indent=2))
 
