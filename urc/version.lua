@@ -14,13 +14,13 @@ function Version.new()
   function self:readVersion()
     -- Look for app_version.txt in sensible places
     local candidates = {
-      self:combine(M.RUN_BASE, "app_version.txt"),
+      self:combine(self.runBase, "app_version.txt"),
       "urc/app_version.txt",
       "app_version.txt",
     }
     for _,p in ipairs(candidates) do
       if fs.exists(p) then
-        local v = trim(readAll(p) or "")
+        local v = self:trim(self:readAll(p) or "")
         if v~="" then return v end
       end
     end
