@@ -7,7 +7,7 @@ local ui      = dofile(rel("ui.lua"))
 local palette = dofile(rel("palette.lua"))
 local store   = dofile(rel("store.lua"))
 local net     = dofile(rel("net.lua"))
-local version = require("version")
+local versionManager = require("version")
 local manifestManager = require("manifestmanager")
 
 -- State ------------------------------------------------------------
@@ -22,6 +22,7 @@ local updateBtn = nil   -- rect from ui.footerVersion; nil until drawn
 
 
 local manifestMngr = manifestManager.new()
+local versionMngr = versionManager.new()
 
 local function effectiveState(o)
   if o.invert then return (o.state == "On") and "Off" or "On" end
@@ -42,7 +43,7 @@ local function colorExistsExcept(srvId, name, exceptIdx)
 end
 
 local function renderVersion()
-  local installedVersion = "v" .. version.VERSION   -- version = dofile("urc/version.lua")
+  local installedVersion = "v" .. versionMngr:readVersion()   -- version = dofile("urc/version.lua")
   manifestMngr:setData()
   local latestVersion    = manifestMngr.latestVersion or installedVersion
   local updateText = (manifestMngr:vcmp(installedVersion, latestVersion) >= 0) and "Latest" or "Update"
@@ -337,7 +338,7 @@ while true do
           buf:commit()
           sleep(1)
         end
-        
+
         manifestMngr:setData()
 
         if pageState == "main" then
