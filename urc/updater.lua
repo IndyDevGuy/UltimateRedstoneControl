@@ -55,16 +55,22 @@ local function saveLock(obj) writeAll(LOCK_PATH, jsonE(obj)) end
 local manifestUrl
 local lock = loadLock()
 if lock then
-manifestUrl = lock.manifest_url
+  manifestUrl = lock.manifest_url
 elseif not lock or not lock.manifest_url then
-manifestUrl = manifestFromOwnerRepo("indydevguy", "UltimateRedstoneControl")
+  manifestUrl = manifestFromOwnerRepo("indydevguy", "UltimateRedstoneControl")
 end
 
--- ---------- fetch latest version info ----------
-local installedVersion = "1.0.1"
-local prev = loadLock()
-if prev and prev.version then installedVersion = prev.version end
+-- --- installed version from module (single source of truth) ---
+local installedVersion = "0.0.0"
+do
+  local ok, vermod = pcall(dofile, "urc/version.lua")
+  if ok and type(vermod)=="table" and vermod.VERSION then installedVersion = vermod.VERSION
+  else
+    lock = loadLock(); if lock and lock.version then installedVersion = lock.version end
+  end
+end
 
+--- latest version from Pages app.json (if present) ---
 local latestVersion, latestManifestUrl = nil, manifestUrl
 do
   local ok, data = pcall(fetch, appJsonFromManifest(manifestUrl))
