@@ -21,37 +21,41 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Generate manifest.json and installer.json
+      - name: Generate manifest.json, app.json, and installer.json
         run: |
           python3 - <<'PY'
-          import os, json, pathlib
-          repo = os.environ['GITHUB_REPOSITORY']            # owner/repo
-          sha  = os.environ['GITHUB_SHA']                   # current commit
-          root = pathlib.Path('urc')                        # ship everything under /urc
+          import os, json, pathlib, time
+          owner, repo = os.environ['GITHUB_REPOSITORY'].split('/', 1)
+          sha  = os.environ['GITHUB_SHA']
+          root = pathlib.Path('urc')
+
           urls = []
           if root.exists():
             for p in sorted(root.rglob('*')):
               if p.is_file():
-                rel = p.as_posix()
-                urls.append(f'https://raw.githubusercontent.com/{repo}/{sha}/{rel}')
-          else:
-            print("WARNING: no /urc directory found; manifest will be empty.")
+                urls.append(f'https://raw.githubusercontent.com/{owner}/{repo}/{sha}/{p.as_posix()}')
 
-          pathlib.Path('public').mkdir(exist_ok=True)
-          with open('public/manifest.json','w') as f:
-            json.dump(urls, f, indent=2)
+          out = pathlib.Path('public'); out.mkdir(exist_ok=True)
+          (out/'manifest.json').write_text(json.dumps(urls, indent=2))
 
-          # installer.json: version + raw URL to install.lua (pinned to commit)
-          version = "0.0.0"
-          if pathlib.Path('installer_version.txt').exists():
-            version = pathlib.Path('installer_version.txt').read_text().strip() or "0.0.0"
-          inst_url = f'https://raw.githubusercontent.com/{repo}/{sha}/install.lua'
-          with open('public/installer.json','w') as f:
-            json.dump({"version": version, "url": inst_url}, f, indent=2)
+          # app.json (version + stable manifest URL + commit)
+          version = '0.0.0'
+          pv = pathlib.Path('app_version.txt')
+          if pv.exists(): version = pv.read_text().strip() or '0.0.0'
+          app = {
+            "version": version,
+            "manifest_url": f"https://{owner}.github.io/{repo}/manifest.json",
+            "commit": sha,
+            "built_at": int(time.time())
+          }
+          (out/'app.json').write_text(json.dumps(app, indent=2))
 
-          print(f"Wrote manifest.json ({len(urls)} files) and installer.json (v{version})")
+          # installer.json (for self-updating installer.lua)
+          inst_url = f'https://raw.githubusercontent.com/{owner}/{repo}/{sha}/install.lua'
+          (out/'installer.json').write_text(json.dumps({"version": version, "url": inst_url}, indent=2))
+
+          print(f"Wrote manifest.json ({len(urls)} files), app.json (v{version}), installer.json")
           PY
-
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

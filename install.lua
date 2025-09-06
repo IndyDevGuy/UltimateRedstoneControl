@@ -132,10 +132,19 @@ for i,url in ipairs(items) do
   end
 end
 
+-- fetch app.json to record version in lock
+local function appJsonFrom(manifestUrl) return manifestUrl:gsub("/manifest%.json$","/app.json") end
+local ver = "0.0.0"
+local ok, aj = pcall(fetch, appJsonFrom(manifestUrl))
+if ok and aj then
+  local o = jsonDecode(aj); if type(o)=="table" and o.version then ver = o.version end
+end
+
 -- write a lock for updater.lua to use later
 writeAll("urc/.manifest.lock", jsonEncode({
   manifest_url = manifestUrl,
-  files = installed
+  version      = ver,
+  files        = installed
 }))
 
 print("Done. You can run: /urc/app.lua")
