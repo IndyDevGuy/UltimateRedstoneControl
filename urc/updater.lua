@@ -24,6 +24,10 @@ local function fetch(url) if not http then error("HTTP API disabled") end local 
 local function jsonD(s) local f=textutils.unserialiseJSON or textutils.unserializeJSON; local ok,v=pcall(f,s); return ok and v or nil end
 local function jsonE(t) local f=textutils.serialiseJSON or textutils.serializeJSON; return f(t,true) end
 
+local function trim(s) return (s or ""):gsub("^%s+",""):gsub("%s+$","") end
+local function combine(a,b) return fs.combine(a or "", b or "") end
+local RUN_BASE = fs.getDir(shell.getRunningProgram() or "")  -- dir of this updater.lua
+
 local function pathFromUrl(url)
   local rel = url:match("^https?://raw%.githubusercontent%.com/[^/]+/[^/]+/[^/]+/(.+)$")
            or url:match("^https?://github%.com/[^/]+/[^/]+/raw/[^/]+/(.+)$")
@@ -31,9 +35,6 @@ local function pathFromUrl(url)
            or ("urc/"..(url:match("/([^/]+)$") or "downloaded.file"))
   return rel
 end
-
-local function combine(a,b) return fs.combine(a or "", b or "") end
-local RUN_BASE = fs.getDir(shell.getRunningProgram() or "")  -- dir of this updater.lua
 
 local function baseFromManifest(url) return (url:gsub("/manifest%.json$","")) end
 local function appJsonFromManifest(url) return baseFromManifest(url).."/app.json" end
