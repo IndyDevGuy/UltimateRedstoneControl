@@ -23,20 +23,5 @@ local function readVersion()
   return nil
 end
 
-local function getLatestVersion()
-  local latestVersion = nil
-do
-  local ok, data = pcall(fetch, appJsonFromManifest(manifestUrl))
-  if ok and data then
-    local app = jsonD(data)
-    if type(app)=="table" then
-      latestVersion = app.version or latestVersion
-      latestManifestUrl = app.manifest_url or latestManifestUrl
-    end
-  end
-end
-end
-
 M.VERSION = readVersion()
-M.LATEST = getLatestVersion()
 return M
