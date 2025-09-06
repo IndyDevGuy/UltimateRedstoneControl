@@ -2,30 +2,41 @@
 -- Exposes VERSION by reading the same text file used by your Pages workflow.
 local M = {}
 
-local function readAll(p)
-  local f = fs.open(p, "r")
-  if not f then return nil end
-  local s = f.readAll(); f.close(); return s
-end
+local function readAll(p) local f=fs.open(p,"r"); if not f then return nil end local s=f.readAll(); f.close(); return s end
+local function trim(s) return (s or ""):gsub("^%s+",""):gsub("%s+$","") end
+local function combine(a,b) return fs.combine(a or "", b or "") end
+M.RUN_BASE = fs.getDir(shell.getRunningProgram() or "")
 
-local function trim(s) return (s or ""):gsub("^%s+", ""):gsub("%s+$", "") end
-
-local function findVersionTxt()
-  -- Prefer alongside this module (installed under /urc)
-  local here = fs.combine(fs.getDir(shell.getRunningProgram()), "app_version.txt")
-  if fs.exists(here) then return here end
-  -- Fallbacks (in case of different loaders)
-  if fs.exists("urc/app_version.txt") then return "urc/app_version.txt" end
-  if fs.exists("app_version.txt") then return "app_version.txt" end
+local function readVersion()
+  -- Look for app_version.txt in sensible places
+  local candidates = {
+    combine(M.RUN_BASE, "app_version.txt"),
+    "urc/app_version.txt",
+    "app_version.txt",
+  }
+  for _,p in ipairs(candidates) do
+    if fs.exists(p) then
+      local v = trim(readAll(p) or "")
+      if v~="" then return v end
+    end
+  end
   return nil
 end
 
-local function readVersion()
-  local p = findVersionTxt()
-  if not p then return "0.0.0" end
-  return trim(readAll(p)) ~= "" and trim(readAll(p)) or "0.0.0"
+local function getLatestVersion()
+  local latestVersion = nil
+do
+  local ok, data = pcall(fetch, appJsonFromManifest(manifestUrl))
+  if ok and data then
+    local app = jsonD(data)
+    if type(app)=="table" then
+      latestVersion = app.version or latestVersion
+      latestManifestUrl = app.manifest_url or latestManifestUrl
+    end
+  end
+end
 end
 
 M.VERSION = readVersion()
-
+M.LATEST = getLatestVersion()
 return M

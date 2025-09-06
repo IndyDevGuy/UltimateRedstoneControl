@@ -67,6 +67,41 @@ function M.footerBack(buf)
   buf:text(1, h, "<-Back", colors.white, colors.black)
 end
 
+function M.footerVersion(buf, version, updateText)
+  local w, h = buf.w, buf.h
+  local upd = tostring(updateText or "")
+  local ver = tostring(version or "")
+  local total = #upd + 1 + #ver           -- one space between
+  local x1 = math.floor((w / 2) + ((w / 2) - total) / 2) + 1
+  local y  = h
+
+  -- clean just the area we’ll draw on
+  buf:hline(x1, y, x1 + total - 1, colors.black)
+  local updateColor = (upd == "Update") and colors.yellow or colors.green
+  buf:text(x1, y, upd, updateColor, colors.black)
+  buf:text(x1 + #upd + 1, y, ver, colors.white, colors.black)
+
+  -- return a clickable rect for the update word
+  return { x1 = x1, x2 = x1 + #upd - 1, y = y, active = (upd == "Update") }
+
+  --local updateCharCount = string.len(updateText)
+  --local versionCharCount = string.len(version)
+  --display the update text first
+  --local halfWidth = w / 2
+  --local xPos = halfWidth + ((halfWidth - (updateCharCount + versionCharCount)) / 2) + 1
+  --buf:hline(xPos, h, xPos, colors.black)
+
+  --local updateColor = colors.green
+  --if updateText == "Update" then
+    --updateColor = colors.yellow
+  --end
+  --buf:text(xPos, h, updateText, updateColor, colors.black)
+ 
+  --xPos = xPos + versionCharCount + 1
+  --buf:hline(xPos, h, xPos, colors.black)
+  --buf:text(xPos, h, version, colors.white, colors.black)
+end
+
 -- NEW: visible input helper (shows buffer while typing)
 function M.readAt(buf, x, y, opts)
   opts = opts or {}

@@ -7,6 +7,8 @@ local ui      = dofile(rel("ui.lua"))
 local palette = dofile(rel("palette.lua"))
 local store   = dofile(rel("store.lua"))
 local net     = dofile(rel("net.lua"))
+local version = require("version")
+local manifestManager = require("manifestmanager")
 
 -- State ------------------------------------------------------------
 local pages = store.load()
@@ -16,6 +18,10 @@ local serverScroll, outputScroll = 0, 0
 
 local W, H = term.getSize()
 local buf = ui.newBuffer(W, H)
+local updateBtn = nil   -- rect from ui.footerVersion; nil until drawn
+
+
+local manifestMngr = manifestManager.new()
 
 local function effectiveState(o)
   if o.invert then return (o.state == "On") and "Off" or "On" end
@@ -33,6 +39,14 @@ local function colorExistsExcept(srvId, name, exceptIdx)
     if i ~= exceptIdx and o.cable == name then return true end
   end
   return false
+end
+
+local function renderVersion()
+  local installedVersion = "v" .. version.VERSION   -- version = dofile("urc/version.lua")
+  local latestVersion    = manifestMngr.latestVersion or installedVersion
+  local updateText = (manifestMngr:vcmp(installedVersion, latestVersion) >= 0) and "Latest" or "Update"
+  -- draw + capture clickable rect
+  updateBtn = ui.footerVersion(buf, installedVersion, updateText)
 end
 
 -- Renderers --------------------------------------------------------
@@ -59,7 +73,7 @@ local function renderMain()
       buf:hline(W, rowY, W, colors.red); buf:text(W, rowY, "X", colors.white, colors.red)
     end
   end
-  --ui.footerBack(buf)
+  renderVersion()
   buf:commit()
 end
 
@@ -97,6 +111,7 @@ local function renderServer()
     end
   end
   ui.footerBack(buf)
+  renderVersion()
   buf:commit()
 end
 
@@ -104,6 +119,7 @@ local function renderPickColor(title, selected, existsFn)
   buf:clear(colors.black)
   ui.header(buf, title)
   ui.footerBack(buf)
+  renderVersion()
   buf:text(2, 5, "Pick a new cable color:")
   local pox, poy = math.floor(W/2 - 7), 7
   palette.draw(buf, selected, pox, poy, existsFn)
@@ -304,6 +320,39 @@ while true do
 
   elseif ev == "mouse_click" then
     local mx, my = p2, p3
+    -- Global footer "Update" button
+    if updateBtn and updateBtn.active then
+      local mx, my = p2, p3
+      if my == updateBtn.y and mx >= updateBtn.x1 and mx <= updateBtn.x2 then
+        -- Optional: show feedback
+        buf:text(updateBtn.x1, updateBtn.y, "Updating…", colors.white, colors.black)
+        buf:commit()
+
+        -- Run updater (no args -> uses lock). Adjust path if you keep it elsewhere.
+        local ok, err = pcall(function() shell.run("urc/updater.lua") end)
+        if not ok then
+          -- brief error flash; keep it simple to avoid flashing whole UI
+          buf:text(updateBtn.x1, updateBtn.y, "Update failed", colors.red, colors.black)
+          buf:commit()
+          sleep(1)
+        end
+
+        -- Reload version + manifest and re-render current screen
+        version       = dofile(rel("version.lua"))
+        manifestMngr:setData()
+
+        if pageState == "main" then
+          renderMain()
+        elseif pageState == "page" then
+          renderServer()
+        else
+          -- fallback: redraw current buffer if you have other screens
+          renderMain()
+        end
+        -- consume click so it doesn't fall through to list logic
+        --goto continue_event_loop
+      end
+    end
     if pageState == "main" then
       if not (mx <= 6 and my == H) then
         local firstY, visible = 4, math.max(0, (H) - 4)

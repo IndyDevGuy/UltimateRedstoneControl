@@ -1,11 +1,11 @@
 -- updater.lua — update URC from GitHub Pages manifest with versioning
 -- Usage:
---   updater <owner> <repo>
---   updater <manifest-url>
---   updater                  -- uses urc/.manifest.lock from last run
+--   updater
 -- Flags:
 --   --force                  -- overwrite even if versions match
 --   --check                  -- just print versions and exit
+local version = require("version")
+local manifestManager = require("manifestmanager")
 
 local args = {...}
 local FORCE, CHECK = false, false
@@ -24,27 +24,12 @@ local function fetch(url) if not http then error("HTTP API disabled") end local 
 local function jsonD(s) local f=textutils.unserialiseJSON or textutils.unserializeJSON; local ok,v=pcall(f,s); return ok and v or nil end
 local function jsonE(t) local f=textutils.serialiseJSON or textutils.serializeJSON; return f(t,true) end
 
-local function trim(s) return (s or ""):gsub("^%s+",""):gsub("%s+$","") end
-local function combine(a,b) return fs.combine(a or "", b or "") end
-local RUN_BASE = fs.getDir(shell.getRunningProgram() or "")  -- dir of this updater.lua
-
 local function pathFromUrl(url)
   local rel = url:match("^https?://raw%.githubusercontent%.com/[^/]+/[^/]+/[^/]+/(.+)$")
            or url:match("^https?://github%.com/[^/]+/[^/]+/raw/[^/]+/(.+)$")
            or url:match("/(urc/.+)$")
            or ("urc/"..(url:match("/([^/]+)$") or "downloaded.file"))
   return rel
-end
-
-local function baseFromManifest(url) return (url:gsub("/manifest%.json$","")) end
-local function appJsonFromManifest(url) return baseFromManifest(url).."/app.json" end
-local function manifestFromOwnerRepo(owner,repo) return ("https://%s.github.io/%s/manifest.json"):format(owner,repo) end
-
-local function vcmp(a,b)  -- returns -1,0,1
-  local function parts(v) local t={} for n in tostring(v):gmatch("%d+") do t[#t+1]=tonumber(n) end return t end
-  local A,B=parts(a or "0"),parts(b or "0"); local n=math.max(#A,#B)
-  for i=1,n do local x=A[i] or 0; local y=B[i] or 0; if x<y then return -1 elseif x>y then return 1 end end
-  return 0
 end
 
 -- ---------- lock handling ----------
@@ -56,65 +41,24 @@ end
 local function saveLock(obj) writeAll(LOCK_PATH, jsonE(obj)) end
 
 -- ---------- choose manifest URL ----------
-local manifestUrl
-local lock = loadLock()
-if lock then
-  manifestUrl = lock.manifest_url
-elseif not lock or not lock.manifest_url then
-  manifestUrl = manifestFromOwnerRepo("indydevguy", "UltimateRedstoneControl")
-end
 
--- ---------- installed version (robust) ----------
-local function tryLoadVersionModule()
-  -- Try version.lua relative to this script first (works whether updater.lua is in / or /urc)
-  local candidates = {
-    combine(RUN_BASE, "version.lua"),
-    "urc/version.lua",
-    "version.lua",
-  }
-  for _,p in ipairs(candidates) do
-    if fs.exists(p) then
-      local ok, m = pcall(dofile, p)
-      if ok and type(m)=="table" and m.VERSION and m.VERSION~="" then return trim(m.VERSION) end
-    end
-  end
-  return nil
-end
-
-local function tryReadVersionTxt()
-  -- Look for app_version.txt in sensible places
-  local candidates = {
-    combine(RUN_BASE, "app_version.txt"),
-    "urc/app_version.txt",
-    "app_version.txt",
-  }
-  for _,p in ipairs(candidates) do
-    if fs.exists(p) then
-      local v = trim(readAll(p) or "")
-      if v~="" then return v end
-    end
-  end
-  return nil
-end
-
-
-local installedVersion = tryLoadVersionModule() or tryReadVersionTxt()
+local installedVersion = version.VERSION
 if not installedVersion then
   local lock=loadLock(); installedVersion = (lock and lock.version) or "0.0.0"
 end
 
 --- latest version from Pages app.json (if present) ---
-local latestVersion, latestManifestUrl = nil, manifestUrl
-do
-  local ok, data = pcall(fetch, appJsonFromManifest(manifestUrl))
-  if ok and data then
-    local app = jsonD(data)
-    if type(app)=="table" then
-      latestVersion = app.version or latestVersion
-      latestManifestUrl = app.manifest_url or latestManifestUrl
-    end
-  end
+local manifestMngr = manifestManager.new()
+local latestVersion = manifestMngr.latestVersion
+
+local manifestUrl
+local lock = loadLock()
+if lock then
+  manifestUrl = lock.manifest_url
+elseif not lock or not lock.manifest_url then
+  manifestUrl = manifestMngr.latestManifestUrl
 end
+local latestManifestUrl = manifestUrl
 
 -- Fallback if app.json missing
 if not latestVersion then latestVersion = "0.0.0" end
@@ -123,14 +67,14 @@ print(("Installed version: %s"):format(installedVersion))
 print(("Available  version: %s"):format(latestVersion))
 
 if CHECK and not FORCE then return end
-if not FORCE and vcmp(installedVersion, latestVersion) >= 0 then
+if not FORCE and manifestMngr:vcmp(installedVersion, latestVersion) >= 0 then
   print("Already up to date. Use --force to re-install.")
   return
 end
 
 -- ---------- update using manifest ----------
 print("Fetching manifest: "..latestManifestUrl)
-local items = jsonD(fetch(latestManifestUrl))
+local items = manifestMngr.items
 assert(type(items)=="table","Invalid manifest JSON")
 
 -- Build sets for cleanup
