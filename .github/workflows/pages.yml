@@ -1,0 +1,58 @@
+name: Build manifest & deploy to Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate manifest.json (raw URLs, pinned to commit)
+        run: |
+          python3 - <<'PY'
+          import os, json, pathlib
+          repo = os.environ['GITHUB_REPOSITORY']            # owner/repo
+          sha  = os.environ['GITHUB_SHA']                   # current commit
+          root = pathlib.Path('urc')                        # ship everything under /urc
+          urls = []
+          if root.exists():
+            for p in sorted(root.rglob('*')):
+              if p.is_file():
+                rel = p.as_posix()
+                urls.append(f'https://raw.githubusercontent.com/{repo}/{sha}/{rel}')
+          else:
+            print("WARNING: no /urc directory found; manifest will be empty.")
+          pathlib.Path('public').mkdir(exist_ok=True)
+          with open('public/manifest.json','w') as f:
+            json.dump(urls, f, indent=2)
+          print(f"Wrote manifest.json with {len(urls)} entries")
+          PY
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
