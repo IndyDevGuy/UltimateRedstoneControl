@@ -68,6 +68,7 @@ jobs:
   build:
     name: Build site
     needs: detect
+    if: needs.detect.outputs.version_changed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -126,6 +127,7 @@ jobs:
   deploy:
     name: Deploy to pages
     needs: build
+    if: needs.detect.outputs.version_changed == 'true' || github.event_name == 'workflow_dispatch'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -137,6 +139,7 @@ jobs:
   verify:
     name: Verify site is live
     needs: deploy
+    if: needs.detect.outputs.version_changed == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Wait for CDN & verify manifest is live
