@@ -60,6 +60,12 @@ jobs:
           print(f"Wrote manifest.json ({len(urls)} files), app.json (v{version}), installer.json")
           PY
 
+      # Prevent Jekyll from hiding anything
+      - name: Add .nojekyll
+        run: |
+          mkdir -p public
+          touch public/.nojekyll
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -74,3 +80,25 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+  
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for CDN & verify manifest is live
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPO:  ${{ github.event.repository.name }}
+        run: |
+          URL="https://${OWNER}.github.io/${REPO}/manifest.json"
+          echo "Probing $URL"
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+            if [ "$code" = "200" ]; then
+              echo "OK: $URL is live"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Timed out waiting for $URL" >&2
+          exit 1
