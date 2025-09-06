@@ -66,6 +66,8 @@ jobs:
           echo "Changed? $CHANGED"
 
   build:
+    name: Build site
+    needs: detect
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -122,6 +124,7 @@ jobs:
           path: public
 
   deploy:
+    name: Deploy to pages
     needs: build
     environment:
       name: github-pages
@@ -132,6 +135,7 @@ jobs:
         uses: actions/deploy-pages@v4
   
   verify:
+    name: Verify site is live
     needs: deploy
     runs-on: ubuntu-latest
     steps:
