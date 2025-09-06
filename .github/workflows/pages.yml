@@ -15,6 +15,56 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  detect:
+    name: Detect version change
+    runs-on: ubuntu-latest
+    outputs:
+      version_changed: ${{ steps.diff.outputs.changed }}
+      version_new:     ${{ steps.diff.outputs.new }}
+      version_old:     ${{ steps.diff.outputs.old }}
+    steps:
+      - name: Checkout (full history for diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version before/after
+        id: diff
+        shell: bash
+        env:
+          VER_PATH: urc/app_version.txt
+          BEFORE:   ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          # new version (head)
+          NEW="0.0.0"
+          if [[ -f "$VER_PATH" ]]; then
+            NEW=$(tr -d '\r\n' < "$VER_PATH" || true)
+            [[ -z "$NEW" ]] && NEW="0.0.0"
+          fi
+
+          # old version (previous commit on this branch)
+          OLD="missing"
+          if [[ -n "${BEFORE:-}" && "$BEFORE" != "0000000000000000000000000000000000000000" ]]; then
+            if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+              OLD_CONTENT=$(git show "$BEFORE:$VER_PATH" 2>/dev/null || true)
+              if [[ -n "$OLD_CONTENT" ]]; then
+                OLD=$(echo "$OLD_CONTENT" | tr -d '\r\n')
+              fi
+            fi
+          fi
+
+          CHANGED="false"
+          if [[ "$OLD" != "$NEW" ]]; then CHANGED="true"; fi
+
+          echo "old=$OLD"       >> "$GITHUB_OUTPUT"
+          echo "new=$NEW"       >> "$GITHUB_OUTPUT"
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+
+          echo "Old version: $OLD"
+          echo "New version: $NEW"
+          echo "Changed? $CHANGED"
+
   build:
     runs-on: ubuntu-latest
     steps:
