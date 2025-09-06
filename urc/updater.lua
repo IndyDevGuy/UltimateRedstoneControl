@@ -63,10 +63,21 @@ end
 -- --- installed version from module (single source of truth) ---
 local installedVersion = "0.0.0"
 do
+  -- First try the module (reads urc/app_version.txt)
   local ok, vermod = pcall(dofile, "urc/version.lua")
-  if ok and type(vermod)=="table" and vermod.VERSION then installedVersion = vermod.VERSION
+  if ok and type(vermod)=="table" and vermod.VERSION and vermod.VERSION ~= "" then
+    installedVersion = vermod.VERSION
   else
-    lock = loadLock(); if lock and lock.version then installedVersion = lock.version end
+    -- Fallback: read lock written by previous installs/updates
+    local f = fs.open("urc/.manifest.lock", "r")
+    if f then
+      local s = f.readAll(); f.close()
+      local dec = textutils.unserialiseJSON or textutils.unserializeJSON
+      local ok2, obj = pcall(dec, s)
+      if ok2 and type(obj)=="table" and obj.version and obj.version ~= "" then
+        installedVersion = obj.version
+      end
+    end
   end
 end
 
