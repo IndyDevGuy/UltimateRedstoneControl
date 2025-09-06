@@ -5,7 +5,7 @@ local M = {}
 local function readAll(p) local f=fs.open(p,"r"); if not f then return nil end local s=f.readAll(); f.close(); return s end
 local function trim(s) return (s or ""):gsub("^%s+",""):gsub("%s+$","") end
 local function combine(a,b) return fs.combine(a or "", b or "") end
-M.RUN_BASE = fs.getDir(shell.getRunningProgram() or "")
+M.RUN_BASE = fs.getDir("")
 
 local function readVersion()
   -- Look for app_version.txt in sensible places
