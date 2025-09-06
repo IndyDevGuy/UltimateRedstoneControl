@@ -60,25 +60,43 @@ elseif not lock or not lock.manifest_url then
   manifestUrl = manifestFromOwnerRepo("indydevguy", "UltimateRedstoneControl")
 end
 
--- --- installed version from module (single source of truth) ---
-local installedVersion = "0.0.0"
-do
-  -- First try the module (reads urc/app_version.txt)
-  local ok, vermod = pcall(dofile, "urc/version.lua")
-  if ok and type(vermod)=="table" and vermod.VERSION and vermod.VERSION ~= "" then
-    installedVersion = vermod.VERSION
-  else
-    -- Fallback: read lock written by previous installs/updates
-    local f = fs.open("urc/.manifest.lock", "r")
-    if f then
-      local s = f.readAll(); f.close()
-      local dec = textutils.unserialiseJSON or textutils.unserializeJSON
-      local ok2, obj = pcall(dec, s)
-      if ok2 and type(obj)=="table" and obj.version and obj.version ~= "" then
-        installedVersion = obj.version
-      end
+-- ---------- installed version (robust) ----------
+local function tryLoadVersionModule()
+  -- Try version.lua relative to this script first (works whether updater.lua is in / or /urc)
+  local candidates = {
+    combine(RUN_BASE, "version.lua"),
+    "urc/version.lua",
+    "version.lua",
+  }
+  for _,p in ipairs(candidates) do
+    if fs.exists(p) then
+      local ok, m = pcall(dofile, p)
+      if ok and type(m)=="table" and m.VERSION and m.VERSION~="" then return trim(m.VERSION) end
     end
   end
+  return nil
+end
+
+local function tryReadVersionTxt()
+  -- Look for app_version.txt in sensible places
+  local candidates = {
+    combine(RUN_BASE, "app_version.txt"),
+    "urc/app_version.txt",
+    "app_version.txt",
+  }
+  for _,p in ipairs(candidates) do
+    if fs.exists(p) then
+      local v = trim(readAll(p) or "")
+      if v~="" then return v end
+    end
+  end
+  return nil
+end
+
+
+local installedVersion = tryLoadVersionModule() or tryReadVersionTxt()
+if not installedVersion then
+  local lock=loadLock(); installedVersion = (lock and lock.version) or "0.0.0"
 end
 
 --- latest version from Pages app.json (if present) ---
