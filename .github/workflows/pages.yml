@@ -40,7 +40,7 @@ jobs:
 
           # app.json (version + stable manifest URL + commit)
           version = '0.0.0'
-          pv = pathlib.Path('app_version.txt')
+          pv = pathlib.Path('urc/app_version.txt')
           if pv.exists(): version = pv.read_text().strip() or '0.0.0'
           app = {
             "version": version,
