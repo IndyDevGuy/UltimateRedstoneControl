@@ -7,7 +7,9 @@ local ui      = dofile(rel("ui.lua"))
 local palette = dofile(rel("palette.lua"))
 local store   = dofile(rel("store.lua"))
 local net     = dofile(rel("net.lua"))
-local versionManager = require("version")
+local registryManager = require("registrymanager")
+local utilityManager = require("utilities")
+local versionManager = require("versionmanager")
 local manifestManager = require("manifestmanager")
 
 -- State ------------------------------------------------------------
@@ -20,9 +22,12 @@ local W, H = term.getSize()
 local buf = ui.newBuffer(W, H)
 local updateBtn = nil   -- rect from ui.footerVersion; nil until drawn
 
+-- make registry class (factory)
+local registryMngr = registryManager.new()
 
-local manifestMngr = manifestManager.new()
-local versionMngr = versionManager.new()
+registryMngr.registry.utilities = utilityManager.new()
+registryMngr.registry.manifestManager = manifestManager.new(registryMngr)
+registryMngr.registry.versionManager = versionManager.new(registryMngr)
 
 local function effectiveState(o)
   if o.invert then return (o.state == "On") and "Off" or "On" end
@@ -43,10 +48,10 @@ local function colorExistsExcept(srvId, name, exceptIdx)
 end
 
 local function renderVersion()
-  local installedVersion = "v" .. versionMngr:readVersion()   -- version = dofile("urc/version.lua")
-  manifestMngr:setData()
-  local latestVersion    = manifestMngr.latestVersion or installedVersion
-  local updateText = (manifestMngr:vcmp(installedVersion, latestVersion) >= 0) and "Latest" or "Update"
+  local installedVersion = "v" .. registryMngr.registry.versionManager:readVersion()   -- version = dofile("urc/version.lua")
+  registryMngr.registry.manifestManager:setData()
+  local latestVersion    = registryMngr.registry.manifestManager.latestVersion or installedVersion
+  local updateText = (registryMngr.registry.utilities:vcmp(installedVersion, latestVersion) >= 0) and "Latest" or "Update"
   -- draw + capture clickable rect
   updateBtn = ui.footerVersion(buf, installedVersion, updateText)
 end
@@ -339,7 +344,7 @@ while true do
           sleep(1)
         end
 
-        manifestMngr:setData()
+        registryMngr.registry.manifestManager:setData()
 
         if pageState == "main" then
           renderMain()

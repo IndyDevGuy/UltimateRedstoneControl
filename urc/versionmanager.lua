@@ -1,26 +1,23 @@
 -- /urc/version.lua
 -- Exposes VERSION by reading the same text file used by your Pages workflow.
-local Version = {}
+local VersionManager = {}
 
-function Version.new()
+function VersionManager.new(registryManager)
   local self = {
+    registryManager = registryManager,
     runBase = fs.getDir("")
   }
-
-  function self:readAll(p) local f=fs.open(p,"r"); if not f then return nil end local s=f.readAll(); f.close(); return s end
-  function self:trim(s) return (s or ""):gsub("^%s+",""):gsub("%s+$","") end
-  function self:combine(a,b) return fs.combine(a or "", b or "") end
 
   function self:readVersion()
     -- Look for app_version.txt in sensible places
     local candidates = {
-      self:combine(self.runBase, "app_version.txt"),
+      self.registryManager.registry.utilities:combine(self.runBase, "app_version.txt"),
       "urc/app_version.txt",
       "app_version.txt",
     }
     for _,p in ipairs(candidates) do
       if fs.exists(p) then
-        local v = self:trim(self:readAll(p) or "")
+        local v = self.registryManager.registry.utilities:trim(self.registryManager.registry.utilities:readAll(p) or "")
         if v~="" then return v end
       end
     end
@@ -28,4 +25,4 @@ function Version.new()
   end
   return self
 end
-return Version
+return VersionManager

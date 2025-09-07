@@ -83,23 +83,6 @@ function M.footerVersion(buf, version, updateText)
 
   -- return a clickable rect for the update word
   return { x1 = x1, x2 = x1 + #upd - 1, y = y, active = (upd == "Update") }
-
-  --local updateCharCount = string.len(updateText)
-  --local versionCharCount = string.len(version)
-  --display the update text first
-  --local halfWidth = w / 2
-  --local xPos = halfWidth + ((halfWidth - (updateCharCount + versionCharCount)) / 2) + 1
-  --buf:hline(xPos, h, xPos, colors.black)
-
-  --local updateColor = colors.green
-  --if updateText == "Update" then
-    --updateColor = colors.yellow
-  --end
-  --buf:text(xPos, h, updateText, updateColor, colors.black)
- 
-  --xPos = xPos + versionCharCount + 1
-  --buf:hline(xPos, h, xPos, colors.black)
-  --buf:text(xPos, h, version, colors.white, colors.black)
 end
 
 -- NEW: visible input helper (shows buffer while typing)

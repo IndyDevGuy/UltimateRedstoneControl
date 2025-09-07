@@ -4,7 +4,9 @@
 -- Flags:
 --   --force                  -- overwrite even if versions match
 --   --check                  -- just print versions and exit
-local version = require("version")
+local registryManager = require("registrymanager")
+local utilityManager = require("utilities")
+local versionManager = require("versionmanager")
 local manifestManager = require("manifestmanager")
 
 local args = {...}
@@ -15,15 +17,6 @@ for i = #args, 1, -1 do
   end
 end
 
-local LOCK_PATH = "urc/.manifest.lock"
-
--- ---------- misc helpers ----------
-local function readAll(p) local f=fs.open(p,"r"); if not f then return nil end local s=f.readAll(); f.close(); return s end
-local function writeAll(p,s) local d=fs.getDir(p); if d~="" and not fs.exists(d) then fs.makeDir(d) end local f=fs.open(p,"w"); assert(f,"Cannot write "..p); f.write(s); f.close() end
-local function fetch(url) if not http then error("HTTP API disabled") end local ok,res=pcall(http.get,url); if not ok or not res then error("HTTP GET failed: "..tostring(url)) end local b=res.readAll(); res.close(); return b end
-local function jsonD(s) local f=textutils.unserialiseJSON or textutils.unserializeJSON; local ok,v=pcall(f,s); return ok and v or nil end
-local function jsonE(t) local f=textutils.serialiseJSON or textutils.serializeJSON; return f(t,true) end
-
 local function pathFromUrl(url)
   local rel = url:match("^https?://raw%.githubusercontent%.com/[^/]+/[^/]+/[^/]+/(.+)$")
            or url:match("^https?://github%.com/[^/]+/[^/]+/raw/[^/]+/(.+)$")
@@ -32,31 +25,28 @@ local function pathFromUrl(url)
   return rel
 end
 
--- ---------- lock handling ----------
-local function loadLock()
-  local s = readAll(LOCK_PATH); if not s then return nil end
-  local obj = jsonD(s); if type(obj)~="table" then return nil end
-  return obj
-end
-local function saveLock(obj) writeAll(LOCK_PATH, jsonE(obj)) end
+-- make registry class (factory)
+local registryMngr = registryManager.new()
 
+registryMngr.registry.utilities = utilityManager.new()
+registryMngr.registry.manifestManager = manifestManager.new(registryMngr)
+registryMngr.registry.versionManager = versionManager.new(registryMngr)
 -- ---------- choose manifest URL ----------
 
-local installedVersion = version.VERSION
+local installedVersion = registryMngr.registry.versionManager:readVersion()
 if not installedVersion then
-  local lock=loadLock(); installedVersion = (lock and lock.version) or "0.0.0"
+  local lock=registryMngr.registry.utilities:loadLock(); installedVersion = (lock and lock.version) or "0.0.0"
 end
 
 --- latest version from Pages app.json (if present) ---
-local manifestMngr = manifestManager.new()
-local latestVersion = manifestMngr.latestVersion
+local latestVersion = registryMngr.registry.manifestManager.latestVersion
 
 local manifestUrl
-local lock = loadLock()
+local lock = registryMngr.registry.utilities:loadLock()
 if lock then
   manifestUrl = lock.manifest_url
 elseif not lock or not lock.manifest_url then
-  manifestUrl = manifestMngr.latestManifestUrl
+  manifestUrl = registryMngr.registry.manifestManager.latestManifestUrl
 end
 local latestManifestUrl = manifestUrl
 
@@ -67,14 +57,14 @@ print(("Installed version: %s"):format(installedVersion))
 print(("Available  version: %s"):format(latestVersion))
 
 if CHECK and not FORCE then return end
-if not FORCE and manifestMngr:vcmp(installedVersion, latestVersion) >= 0 then
+if not FORCE and registryMngr.registry.utilities:vcmp(installedVersion, latestVersion) >= 0 then
   print("Already up to date. Use --force to re-install.")
   return
 end
 
 -- ---------- update using manifest ----------
 print("Fetching manifest: "..latestManifestUrl)
-local items = manifestMngr.items
+local items = registryMngr.registry.manifestManager.items
 assert(type(items)=="table","Invalid manifest JSON")
 
 -- Build sets for cleanup
@@ -96,12 +86,12 @@ for i,it in ipairs(newList) do
   local needs = FORCE or (not fs.exists(path))
   local remote
   if not needs then
-    remote = fetch(url)
-    if readAll(path) ~= remote then needs = true end
+    remote = registryMngr.registry.utilities:fetch(url)
+    if registryMngr.registry.utilities:readAll(path) ~= remote then needs = true end
   end
   if needs then
-    remote = remote or fetch(url)
-    writeAll(path, remote)
+    remote = remote or registryMngr.registry.utilities:fetch(url)
+    registryMngr.registry.utilities:writeAll(path, remote)
     if prevSet[path] then updated=updated+1 else created=created+1 end
     print("updated: "..path)
   else
@@ -118,7 +108,7 @@ for p,_ in pairs(prevSet) do
 end
 
 -- Save lock with latest version
-saveLock({
+registryMngr.registry.utilities:saveLock({
   manifest_url = latestManifestUrl,
   version      = latestVersion,
   files        = (function(t) local r={} for _,it in ipairs(newList) do r[#r+1]=it.path end return r end)()
